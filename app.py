@@ -1,276 +1,113 @@
-import streamlit as st
-from ultralytics import YOLO
+import os
 import cv2
 import numpy as np
-from PIL import Image
-import os
 import base64
+from flask import Flask, request, jsonify, render_template
 
-# Page configuration
-st.set_page_config(
-    page_title="Sign Language Detection System",
-    page_icon="🤟",
-    layout="wide"
-)
+app = Flask(__name__)
 
-# Load model (cached)
-@st.cache_resource
-def load_model():
-    return YOLO("model/my_model.pt")
+# Pastikan folder static ada untuk menyimpan file upload
+os.makedirs("static", exist_ok=True)
 
-model = load_model()
+# Load ONNX model menggunakan OpenCV DNN
+net = cv2.dnn.readNetFromONNX("model/my_model.onnx")
 
-# Helper untuk encode local image ke base64 agar bisa dirender custom di HTML
-def get_base64_image(path):
-    if os.path.exists(path):
-        with open(path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode()
-        return f"data:image/jpeg;base64,{encoded_string}"
-    return None
+# Daftar nama kelas SIBI (A-Z)
+CLASSES = [chr(i) for i in range(65, 91)]  # ['A', 'B', ..., 'Z']
 
-# Convert header image to base64
-header_b64 = get_base64_image("static/images/header.png")
-
-# ==========================================
-# ADVANCED CUSTOM CSS INJECTION
-# ==========================================
-st.markdown("""
-<style>
-    /* Import Google Fonts */
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+def run_inference(img):
+    # Preprocessing image untuk YOLOv8 (imgsz=320)
+    blob = cv2.dnn.blobFromImage(img, 1/255.0, (320, 320), swapRB=True, crop=False)
+    net.setInput(blob)
+    outputs = net.forward()
     
-    html, body, [class*="css"], .stApp {
-        font-family: 'Outfit', sans-serif !important;
-        background-color: #fafafa !important;
-    }
+    # Format output YOLOv8: [1, 30, 2100] (di mana 30 = 4 box koordinat + 26 class probabilities)
+    # Kita ambil deteksi dengan skor tertinggi
+    predictions = outputs[0]  # shape: (30, 2100)
+    predictions = np.transpose(predictions)  # shape: (2100, 30)
     
-    /* Custom Card container */
-    .custom-card {
-        background-color: #ffffff;
-        padding: 2.5em;
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.04);
-        border: 1px solid #eaeaea;
-        margin-bottom: 2em;
-    }
+    best_class_id = -1
+    best_score = 0.0
+    best_box = None
     
-    /* Styling tab Streamlit agar menyerupai Nav Bar index.html */
-    button[data-baseweb="tab"] {
-        font-size: 1.15rem !important;
-        color: #666666 !important;
-        font-weight: 500 !important;
-        border-bottom: 2px solid transparent !important;
-        background-color: transparent !important;
-        padding: 10px 20px !important;
-        transition: all 0.3s ease !important;
-    }
-    button[data-baseweb="tab"]:hover {
-        color: #ffafcc !important;
-    }
-    button[data-baseweb="tab"][aria-selected="true"] {
-        color: #ffafcc !important;
-        border-bottom: 2px solid #ffafcc !important;
-        font-weight: 600 !important;
-    }
-    
-    /* Styling tombol agar pink pastel */
-    div.stButton > button {
-        background-color: #ffc8dd !important;
-        color: #000000 !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 10px 24px !important;
-        font-weight: 500 !important;
-        transition: background 0.3s ease;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        display: block;
-        margin: 0 auto;
-    }
-    div.stButton > button:hover {
-        background-color: #ffafcc !important;
-        color: #000000 !important;
-    }
-    
-    /* Input border customization */
-    input {
-        border-radius: 8px !important;
-        border: 1px solid #ccc !important;
-        padding: 10px !important;
-    }
-    
-    /* Title alignment */
-    .custom-title-section {
-        text-align: center;
-        margin-bottom: 2.5em;
-        margin-top: 1em;
-    }
-    
-    /* Styling label prediksi */
-    .hasil-prediksi {
-        font-size: 22px;
-        font-weight: 600;
-        color: #555555;
-        text-align: center;
-        margin-top: 15px;
-        background: #fdf2f4;
-        padding: 12px;
-        border-radius: 8px;
-        border-left: 5px solid #ffafcc;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# ==========================================
-# MAIN HEADER
-# ==========================================
-st.markdown("""
-<div class="custom-title-section">
-    <h1 style="color: #ffafcc; font-size: 3.2rem; font-weight: 800; margin-bottom: 0.1em; letter-spacing: -1px;">
-        SIBI Sign Language Detection System
-    </h1>
-    <p style="color: #888; font-size: 1.1rem; font-weight: 400; max-width: 700px; margin: 0 auto;">
-        Developed by Azahra Alayda Faris
-    </p>
-</div>
-""", unsafe_allow_html=True)
-
-# Navigasi tab utama
-tab1, tab2, tab3, tab4 = st.tabs(["Introduction", "Upload Gambar", "Realtime Detection", "Text to Gesture"])
-
-# ==========================================
-# TAB 1: INTRODUCTION
-# ==========================================
-with tab1:
-    st.markdown(f"""
-    <div class="custom-card">
-        <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 30px; padding: 10px 0;">
-            <div style="flex: 2; min-width: 300px;">
-                <h2 style="color: #333; margin-top: 0; font-weight: 700; font-size: 2rem;">SIBI Sign Language Detection System</h2>
-                <p style="font-size:1.15rem; line-height:1.9; color:#555; margin-bottom: 1.5em;">
-                A web-based application designed to detect sign language (SIBI) in real-time using the YOLOv8 model. 
-                This system is also equipped with a feature that translates letters into visual gestures, helping users 
-                to understand and learn sign language in a more interactive and accessible way.
-                </p>
-            </div>
-            <div style="flex: 1; min-width: 250px; display: flex; justify-content: center;">
-                <img src="{header_b64}" style="width: 300px; max-width: 100%; border-radius: 8px;" />
-            </div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-# ==========================================
-# TAB 2: UPLOAD GAMBAR
-# ==========================================
-with tab2:
-    st.markdown("""
-    <div class="custom-card" style="text-align: center;">
-        <h2 style="color: #333; margin-top: 0; font-weight: 700; font-size: 2rem;">Upload Gambar</h2>
-        <p style="color: #888; margin-bottom: 0px;">*Please upload an image in JPG or PNG format for optimal detection results.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Drag and drop upload
-    uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
-    
-    if uploaded_file is not None:
-        image = Image.open(uploaded_file)
-        img_array = np.array(image)
-        
-        # YOLO inference
-        results = model(img_array)
-        annotated_img = results[0].plot()
-        annotated_img_rgb = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
-        pred = results[0].names[int(results[0].boxes.cls[0])] if results[0].boxes else "No detection"
-        
-        # Grid tampil
-        st.markdown('<div class="custom-card">', unsafe_allow_html=True)
-        col_img1, col_img2, col_img3 = st.columns([1, 2, 1])
-        with col_img2:
-            st.image(annotated_img_rgb, use_column_width=True)
-            st.markdown(f'<div class="hasil-prediksi">{pred}</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# ==========================================
-# TAB 3: REALTIME DETECTION
-# ==========================================
-with tab3:
-    st.markdown("""
-    <div class="custom-card" style="text-align: center;">
-        <h2 style="color: #333; margin-top: 0; font-weight: 700; font-size: 2rem;">Realtime Detection</h2>
-        <p style="color: #888; margin-bottom: 0px;">Use your webcam to take a photo of SIBI sign language gesture.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    img_file_buffer = st.camera_input("Ambil foto menggunakan webcam", label_visibility="collapsed")
-    
-    if img_file_buffer is not None:
-        img = Image.open(img_file_buffer)
-        img_array = np.array(img)
-        
-        # YOLO inference
-        results = model(img_array)
-        annotated_img = results[0].plot()
-        annotated_img_rgb = cv2.cvtColor(annotated_img, cv2.COLOR_BGR2RGB)
-        pred = results[0].names[int(results[0].boxes.cls[0])] if results[0].boxes else "No detection"
-        
-        # Grid tampil
-        st.markdown('<div class="custom-card">', unsafe_allow_html=True)
-        col_cam1, col_cam2, col_cam3 = st.columns([1, 2, 1])
-        with col_cam2:
-            st.image(annotated_img_rgb, use_column_width=True)
-            st.markdown(f'<div class="hasil-prediksi">{pred}</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# ==========================================
-# TAB 4: TEXT TO GESTURE
-# ==========================================
-with tab4:
-    st.markdown("""
-    <div class="custom-card" style="text-align: center;">
-        <h2 style="color: #333; margin-top: 0; font-weight: 700; font-size: 2rem;">Text to Gesture</h2>
-        <p style="color: #888; margin-bottom: 20px;">Enter letters to translate them into SIBI sign language gestures.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Input box
-    text_input = st.text_input("", placeholder="Enter letters...", label_visibility="collapsed").upper()
-    
-    if text_input:
-        html_images = ""
-        for char in text_input:
-            if char.isalpha():
-                img_path = f"static/images/{char}.jpg"
-                b64_data = get_base64_image(img_path)
-                if b64_data:
-                    # Rendering custom image card dengan border radius & bayangan halus
-                    html_images += f"""
-                    <img src="{b64_data}" style="
-                        margin: 8px; 
-                        border-radius: 8px; 
-                        box-shadow: 0 4px 10px rgba(0,0,0,0.15); 
-                        width: 170px;
-                        border: 1px solid #eee;
-                    " />
-                    """
-        
-        if html_images:
-            st.markdown(f"""
-            <div class="custom-card">
-                <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding: 10px;">
-                    {html_images}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.warning("No visual gesture found for characters input.")
+    for pred in predictions:
+        scores = pred[4:]
+        class_id = np.argmax(scores)
+        score = scores[class_id]
+        if score > 0.4 and score > best_score:  # threshold 0.4
+            best_score = score
+            best_class_id = class_id
+            best_box = pred[0:4]
             
-# Footer copyright
-st.markdown("""
-<div style="text-align: center; margin-top: 4em; color: #888; font-size: 0.9em; border-top: 1px solid #eee; padding-top: 2em; padding-bottom: 2em;">
-    <p>
-        © 2026 SIBI Sign Language Detection System <br>
-        Developed by Azahra Alayda Faris
-    </p>
-</div>
-""", unsafe_allow_html=True)
+    # Gambar bounding box jika terdeteksi
+    h, w = img.shape[:2]
+    pred_label = "No detection"
+    
+    if best_class_id != -1 and best_box is not None:
+        pred_label = CLASSES[best_class_id]
+        # YOLOv8 format: [x_center, y_center, width, height] normalized to 320x320
+        # Kita sesuaikan ke ukuran gambar asli
+        x_center, y_center, box_w, box_h = best_box
+        x_factor = w / 320.0
+        y_factor = h / 320.0
+        
+        left = int((x_center - box_w / 2) * x_factor)
+        top = int((y_center - box_h / 2) * y_factor)
+        width = int(box_w * x_factor)
+        height = int(box_h * y_factor)
+        
+        # Gambar box dan label di image
+        cv2.rectangle(img, (left, top), (left + width, top + height), (180, 200, 255), 3)
+        cv2.putText(img, f"{pred_label} ({best_score:.2f})", (left, top - 10), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (180, 200, 255), 2)
+                    
+    return img, pred_label
+
+@app.route('/')
+def home():
+    return render_template("index.html")
+
+# ======================
+# UPLOAD GAMBAR
+# ======================
+@app.route('/predict-image', methods=['POST'])
+def predict_image():
+    file = request.files['image']
+    filepath = "static/upload.jpg"
+    file.save(filepath)
+
+    img = cv2.imread(filepath)
+    annotated_img, pred = run_inference(img)
+    cv2.imwrite("static/result.jpg", annotated_img)
+
+    return jsonify({
+        "prediction": pred,
+        "image": "/static/result.jpg"
+    })
+
+# ======================
+# WEBCAM FRAME DETECTION
+# ======================
+@app.route('/predict-frame', methods=['POST'])
+def predict_frame():
+    data = request.json['image']
+
+    # Decode base64
+    encoded = data.split(',')[1]
+    nparr = np.frombuffer(base64.b64decode(encoded), np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    annotated_frame, pred = run_inference(img)
+
+    # Encode kembali ke base64
+    _, buffer = cv2.imencode('.jpg', annotated_frame)
+    img_base64 = base64.b64encode(buffer).decode('utf-8')
+
+    return jsonify({
+        "image": img_base64,
+        "prediction": pred
+    })
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5050))
+    app.run(debug=False, host="0.0.0.0", port=port)
