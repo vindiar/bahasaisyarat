@@ -1,0 +1,328 @@
+<!DOCTYPE HTML>
+
+<html lang="en">
+	<head>
+		<title>Sign Language Detection System</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<link rel="stylesheet" href="/static/assets/css/main.css" />
+		
+		<style>
+			.custom-file {
+				background: #ffc8dd;
+				color: white;
+				padding: 10px 20px;
+				border-radius: 8px;
+				cursor: pointer;
+				display: inline-block;
+				font-weight: 500;
+			}
+			
+			button.custom-file {
+				width: 150px;
+				text-align: center;
+			}
+			.custom-file:hover {
+				background: #ffafcc !important;
+			}
+
+			#gesture .button.primary {
+				background: #ffc8dd !important;
+				border: none;
+				color: black !important;
+			}
+
+			#gesture .button.primary:hover {
+			background: #ffafcc !important;
+			color: black !important;
+			}
+
+			#header {
+			padding: 1em 0;
+			}
+
+			@media screen and (max-width: 768px) {
+				.custom-file,
+				button.custom-file {
+					width: 100%;
+					max-width: 300px;
+					padding: 12px;
+					font-size: 0.95rem;
+				}
+
+				#header {
+					padding: 0.8em 0;
+				}
+			}
+
+			@media screen and (max-width: 480px) {
+				.custom-file,
+				button.custom-file {
+					width: 100%;
+					max-width: none;
+					padding: 14px;
+					font-size: 0.9rem;
+				}
+
+				#header {
+					padding: 0.6em 0;
+				}
+			}
+			</style>
+
+
+		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
+	</head>
+
+	<body class="is-preload">
+
+		<!-- Wrapper -->
+			<div id="wrapper">
+
+				<!-- Header -->
+					<header id="header" class="alt">
+					</header>
+
+				<!-- Nav -->
+					<nav id="nav">
+						<ul>
+							<li><a href="#intro" class="active">Introduction</a></li>
+							<li><a href="#upload">Upload</a></li>
+							<li><a href="#realtime">Realtime</a></li>
+							<li><a href="#gesture">Text Gesture</a></li>
+						</ul>
+					</nav>
+
+				<!-- Main -->
+					<div id="main">
+
+						<!-- Introduction -->
+						<section id="intro" class="main">
+							<div class="spotlight">
+
+								<!-- KIRI (TEKS) -->
+								<div class="content">
+									<header class="major">
+										<h2>SIBI Sign Language Detection System</h2>
+									</header>
+
+									<p style="max-width:600px; line-height:1.8;">
+									A web-based application designed to detect sign language (SIBI) in real-time using the YOLOv8 model. 
+									This system is also equipped with a feature that translates letters into visual gestures, helping users 
+									to understand and learn sign language in a more interactive and accessible way.
+									</p>
+
+									<ul class="actions">
+										<li><a href="#realtime" class="button">Try Now</a></li>
+									</ul>
+								</div>
+
+								<!-- KANAN (GAMBAR) -->
+								<span>
+									<img src="/static/images/header.png" style="width:300px;">
+								</span>
+
+						</div>
+					</section>
+
+						<!-- Upload Image -->
+							<section id="upload" class="main special">
+								<header class="major">
+									<h2>Upload Gambar</h2>
+								</header>
+
+								<!-- BUTTON -->
+								<label for="uploadInput" class="custom-file">
+									Choose Image
+								</label>
+
+								<!-- INPUT FILE -->
+								<input type="file" id="uploadInput" accept=".jpg, .jpeg, .png" hidden onchange="uploadImage()">
+
+								<!-- NOTES -->
+								<p style="font-size:0.9em; color:#888; margin-top:10px;">
+									*Please upload an image in JPG or PNG format for optimal detection results.
+								</p>
+
+								<p id="hasilUpload" style="
+									font-size: 20px;
+									font-weight: 600;
+									color: #555;
+									margin-top: 15px;
+								"></p>
+
+								<img id="resultImage" width="500" style="margin-top:20px;">
+							</section>
+
+						<!-- Realtime detection -->
+							<section id="realtime" class="main special">
+								<header class="major">
+									<h2>Realtime Detection</h2>
+								</header>
+
+								<video id="video" autoplay playsinline style="display:none;"></video>
+
+								<img id="resultRealtime" width="100%">
+								<p id="hasilRealtime" style="
+									font-size: 20px;
+									font-weight: 600;
+									color: #555;
+									margin-top: 15px;
+								"></p>
+							</section>
+							
+						<!-- Text to Image  -->
+							<section id="gesture" class="main special">
+								<header class="major">
+									<h2>Text to Gesture</h2>
+								</header>
+
+								<div style="margin-top:20px; display:flex; flex-direction:column; align-items:center; gap:10px;">
+
+									<!-- INPUT -->
+									<input type="text" id="textInput" placeholder="Enter letters..."
+										style="
+											width:250px;
+											padding:10px;
+											border-radius:8px;
+											border:1px solid #ccc;
+											margin-right:10px;
+										">
+
+									<!-- BUTTON -->
+									<a href="#" onclick="showGesture()" class="button primary" style="font-weight:400;">
+										Generate
+									</a>
+									
+
+								</div>
+
+								<div id="result" style="margin-top:20px;"></div>
+							</section>
+					</div>
+
+				<!-- Footer -->
+				<footer id="footer">
+				<p>
+					© 2026 SIBI Sign Language Detection System <br>
+					Developed by Azahra Alayda Faris
+				</p>
+				</footer>
+
+			</div>
+
+		<!-- Scripts -->
+			<script src="/static/assets/js/jquery.min.js"></script>
+			<script src="/static/assets/js/jquery.scrollex.min.js"></script>
+			<script src="/static/assets/js/jquery.scrolly.min.js"></script>
+			<script src="/static/assets/js/browser.min.js"></script>
+			<script src="/static/assets/js/breakpoints.min.js"></script>
+			<script src="/static/assets/js/util.js"></script>
+			<script src="/static/assets/js/main.js"></script>
+
+			<script>
+			/* upload */
+			function uploadImage(){
+				let file = document.getElementById("uploadInput").files[0]
+				let formData = new FormData()
+				formData.append("image", file)
+
+				fetch("/predict-image", {
+					method: "POST",
+					body: formData
+				})
+				.then(res => res.json())
+				.then(data => {
+					document.getElementById("hasilUpload").innerText = data.prediction
+
+					// 🔥 paksa refresh gambar (anti cache)
+					document.getElementById("resultImage").src =
+						data.image + "?t=" + new Date().getTime()
+				})
+			}
+
+			
+			/* realtime */
+			window.addEventListener("load", () => {
+
+			let video = document.getElementById("video")
+
+			navigator.mediaDevices.getUserMedia({ video: true })
+			.then(stream => {
+				video.srcObject = stream
+				video.play()
+			})
+			.catch(err => {
+				console.log("Camera error:", err)
+			})
+
+			setInterval(() => {
+				if (video.readyState === 4) {
+
+					let canvas = document.createElement("canvas")
+					canvas.width = 640
+					canvas.height = 480
+
+					let ctx = canvas.getContext("2d")
+					ctx.drawImage(video, 0, 0, 640, 480)
+
+					let dataURL = canvas.toDataURL("image/jpeg")
+
+					fetch("/predict-frame", {
+						method: "POST",
+						headers: {
+							"Content-Type": "application/json"
+						},
+						body: JSON.stringify({ image: dataURL })
+					})
+					.then(res => res.json())
+					.then(data => {
+						document.getElementById("resultRealtime").src =
+							"data:image/jpeg;base64," + data.image
+
+						document.getElementById("hasilRealtime").innerText =
+							data.prediction
+					})
+					.catch(err => console.log("Fetch error:", err))
+				}
+			}, 150)
+
+		})
+
+			/* mapping */
+			function showGesture(){
+				let text = document.getElementById("textInput").value.toUpperCase()
+				let result = document.getElementById("result")
+
+				result.innerHTML = ""
+
+				if(text.trim() === ""){
+					result.innerHTML = "<p>Please enter text</p>"
+					return
+				}
+
+				text.split("").forEach(char => {
+					if(/[A-Z]/.test(char)){
+						let img = document.createElement("img")
+						img.src = "/static/images/" + char + ".jpg"
+						img.width = 200
+
+						// 🔥 biar bagus
+						img.style.margin = "5px"
+						img.style.borderRadius = "8px"
+						img.style.boxShadow = "0 2px 6px rgba(0,0,0,0.2)"
+
+						result.appendChild(img)
+					}
+				})
+			}
+
+			document.getElementById("textInput").addEventListener("keypress", function(e){
+				if(e.key === "Enter"){
+					showGesture()
+				}
+			})
+
+</script>
+	</body>
+</html>
