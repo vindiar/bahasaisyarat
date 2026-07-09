@@ -1,3 +1,4 @@
+import os
 from flask import Flask, request, jsonify, render_template
 from ultralytics import YOLO
 import base64
@@ -5,6 +6,9 @@ import numpy as np
 import cv2
 
 app = Flask(__name__)
+
+# Ensure static dir exists for uploads
+os.makedirs("static", exist_ok=True)
 
 # load model
 model = YOLO("model/my_model.pt")
@@ -65,4 +69,5 @@ def predict_frame():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5050)
+    port = int(os.environ.get("PORT", 5050))
+    app.run(debug=False, host="0.0.0.0", port=port)

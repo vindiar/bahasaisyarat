@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+.env
+static/upload.jpg
+static/result.jpg
