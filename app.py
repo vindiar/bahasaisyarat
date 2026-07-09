@@ -50,6 +50,7 @@ def run_inference(img):
     # Gambar bounding box jika terdeteksi
     h, w = img.shape[:2]
     pred_label = "No detection"
+    box_coords = None
     
     if best_class_id != -1 and best_box is not None:
         pred_label = CLASSES[best_class_id]
@@ -68,8 +69,9 @@ def run_inference(img):
         cv2.rectangle(img, (left, top), (left + width, top + height), (180, 200, 255), 3)
         cv2.putText(img, f"{pred_label} ({best_score:.2f})", (left, top - 10), 
                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (180, 200, 255), 2)
+        box_coords = [left, top, width, height]
                     
-    return img, pred_label
+    return img, pred_label, box_coords
 
 @app.route('/')
 def home():
@@ -85,7 +87,7 @@ def predict_image():
     file.save(filepath)
 
     img = cv2.imread(filepath)
-    annotated_img, pred = run_inference(img)
+    annotated_img, pred, _ = run_inference(img)
     cv2.imwrite("static/result.jpg", annotated_img)
 
     return jsonify({
@@ -105,15 +107,11 @@ def predict_frame():
     nparr = np.frombuffer(base64.b64decode(encoded), np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-    annotated_frame, pred = run_inference(img)
-
-    # Encode kembali ke base64
-    _, buffer = cv2.imencode('.jpg', annotated_frame)
-    img_base64 = base64.b64encode(buffer).decode('utf-8')
+    _, pred, box = run_inference(img)
 
     return jsonify({
-        "image": img_base64,
-        "prediction": pred
+        "prediction": pred,
+        "box": box
     })
 
 if __name__ == '__main__':

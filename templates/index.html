@@ -162,16 +162,23 @@
 
 								<video id="video" autoplay playsinline style="display:none;"></video>
 
-								<img id="resultRealtime" width="100%">
-								<p id="hasilRealtime" style="
-									font-size: 20px;
-									font-weight: 600;
-									color: #555;
-									margin-top: 15px;
-								"></p>
-							</section>
-							
-						<!-- Text to Image  -->
+						<canvas id="webcamCanvas" style="
+							width: 100%; 
+							max-width: 640px; 
+							border-radius: 12px; 
+							box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+							border: 2px solid #ffafcc;
+						"></canvas>
+
+						<p id="hasilRealtime" style="
+							font-size: 20px;
+							font-weight: 600;
+							color: #555;
+							margin-top: 15px;
+						"></p>
+					</section>
+					
+				<!-- Text to Image  -->
 							<section id="gesture" class="main special">
 								<header class="major">
 									<h2>Text to Gesture</h2>
@@ -246,11 +253,50 @@
 			window.addEventListener("load", () => {
 
 			let video = document.getElementById("video")
+			let canvas = document.getElementById("webcamCanvas")
+			let ctx = canvas.getContext("2d")
+
+			// Resolusi canvas render lokal
+			canvas.width = 640
+			canvas.height = 480
+
+			let currentBox = null
+			let currentPrediction = ""
+
+			// Buttery smooth local video rendering loop (60 FPS)
+			function drawVideo() {
+				if (video.readyState === 4) {
+					// Draw video frame locally
+					ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+					
+					// Draw bounding box if present
+					if (currentBox) {
+						// Scale coordinates dari 320x240 (server) ke 640x480 (canvas)
+						let scaleX = canvas.width / 320
+						let scaleY = canvas.height / 240
+						
+						let left = currentBox[0] * scaleX
+						let top = currentBox[1] * scaleY
+						let width = currentBox[2] * scaleX
+						let height = currentBox[3] * scaleY
+						
+						ctx.strokeStyle = "#ffafcc"
+						ctx.lineWidth = 4
+						ctx.strokeRect(left, top, width, height)
+						
+						ctx.fillStyle = "#ffafcc"
+						ctx.font = "bold 20px 'Outfit', Arial, sans-serif"
+						ctx.fillText(currentPrediction, left, top - 10)
+					}
+				}
+				requestAnimationFrame(drawVideo)
+			}
 
 			navigator.mediaDevices.getUserMedia({ video: true })
 			.then(stream => {
 				video.srcObject = stream
 				video.play()
+				requestAnimationFrame(drawVideo)
 			})
 			.catch(err => {
 				console.log("Camera error:", err)
@@ -261,14 +307,14 @@
 				if (video.readyState === 4 && !isProcessing) {
 					isProcessing = true;
 
-					let canvas = document.createElement("canvas")
-					canvas.width = 320
-					canvas.height = 240
+					// Buat canvas kecil sementara untuk dikirim ke server (hemat bandwidth)
+					let sendCanvas = document.createElement("canvas")
+					sendCanvas.width = 320
+					sendCanvas.height = 240
+					let sendCtx = sendCanvas.getContext("2d")
+					sendCtx.drawImage(video, 0, 0, 320, 240)
 
-					let ctx = canvas.getContext("2d")
-					ctx.drawImage(video, 0, 0, 320, 240)
-
-					let dataURL = canvas.toDataURL("image/jpeg", 0.5)
+					let dataURL = sendCanvas.toDataURL("image/jpeg", 0.5)
 
 					fetch("/predict-frame", {
 						method: "POST",
@@ -279,11 +325,14 @@
 					})
 					.then(res => res.json())
 					.then(data => {
-						document.getElementById("resultRealtime").src =
-							"data:image/jpeg;base64," + data.image
-
-						document.getElementById("hasilRealtime").innerText =
-							data.prediction
+						if (data.box) {
+							currentBox = data.box // [left, top, width, height]
+							currentPrediction = data.prediction
+						} else {
+							currentBox = null
+							currentPrediction = "No detection"
+						}
+						document.getElementById("hasilRealtime").innerText = data.prediction
 						isProcessing = false;
 					})
 					.catch(err => {
