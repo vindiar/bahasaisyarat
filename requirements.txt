@@ -2,7 +2,7 @@
 torch
 torchvision
 flask
-gunicorn
+waitress
 ultralytics
 opencv-python-headless
 numpy
